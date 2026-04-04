@@ -9,10 +9,8 @@ After=getty@tty1.service
 Type=simple
 User=pi
 Group=pi
-ExecStartPre=+/bin/sh -c 'setterm --blank force --cursor off > /dev/tty1 2>/dev/null; echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true'
-ExecStartPre=/usr/bin/python3 /home/pi/lapcam/boot_splash.py
+ExecStartPre=+/bin/sh -c 'setterm --blank force --cursor off > /dev/tty1 2>/dev/null; echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null; modprobe usbmon 2>/dev/null; sleep 1; chmod 644 /sys/kernel/debug/usb/usbmon/*u 2>/dev/null || true'
 Environment=XDG_RUNTIME_DIR=/run/user/1000
-Environment=GPIOZERO_PIN_FACTORY=lgpio
 Environment=PYTHONUNBUFFERED=1
 WorkingDirectory=/home/pi/lapcam
 ExecStart=/usr/bin/python3 /home/pi/lapcam/lapcam.py
