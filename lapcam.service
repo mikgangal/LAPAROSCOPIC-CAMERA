@@ -10,6 +10,7 @@ Type=simple
 User=pi
 Group=pi
 ExecStartPre=+/bin/sh -c 'setterm --blank force --cursor off > /dev/tty1 2>/dev/null; echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true'
+ExecStartPre=/usr/bin/python3 /home/pi/lapcam/boot_splash.py
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=GPIOZERO_PIN_FACTORY=lgpio
 Environment=PYTHONUNBUFFERED=1

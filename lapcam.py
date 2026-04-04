@@ -681,9 +681,17 @@ class LapcamApp:
         print(f"Received signal {signum}, shutting down...")
         self.stop()
 
+    def _auto_start_feed(self):
+        """Auto-start the feed 5 seconds after boot."""
+        if self.state == self.STATE_WELCOME:
+            self._start_feed()
+        return False  # don't repeat
+
     def start(self):
         print("Laparoscopic Camera Trainer starting...")
         self._show_welcome()
+        # Auto-start feed after 5 seconds on first boot
+        GLib.timeout_add_seconds(5, self._auto_start_feed)
         try:
             self.mainloop.run()
         except KeyboardInterrupt:
