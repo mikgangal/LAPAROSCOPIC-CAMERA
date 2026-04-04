@@ -10,6 +10,7 @@ Type=simple
 User=pi
 Group=pi
 ExecStartPre=+/bin/sh -c 'setterm --blank force --cursor off > /dev/tty1 2>/dev/null; echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null; modprobe usbmon 2>/dev/null; sleep 1; chmod 644 /sys/kernel/debug/usb/usbmon/*u 2>/dev/null || true'
+ExecStop=+/usr/sbin/uhubctl -l 1-1 -a off
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=PYTHONUNBUFFERED=1
 WorkingDirectory=/home/pi/lapcam

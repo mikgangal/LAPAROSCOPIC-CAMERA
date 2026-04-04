@@ -581,6 +581,14 @@ class LapcamApp:
 
     def start(self):
         print("Laparoscopic Camera Trainer starting...")
+        show_message("Starting...")
+        # Wait for camera to be available
+        device = self.config.get('camera_device', '/dev/video0')
+        for i in range(10):
+            if os.path.exists(device):
+                break
+            print(f"Waiting for camera ({i+1}/10)...")
+            time.sleep(1)
         self._usb_monitor.start()
         self._start_feed()
         try:
@@ -719,11 +727,17 @@ class LapcamApp:
         self._hud_countdown_line = ''
 
         if resuming:
-            # Pipeline already running — restore video and clear HUD
+            # Pipeline already running — restore video and HUD
             if self.pipeline:
                 blackout = self.pipeline.get_by_name('blackout')
                 if blackout:
                     blackout.set_property('brightness', 0.0)
+                # Restore HUD to normal position and size
+                overlay = self.pipeline.get_by_name('hud_overlay')
+                if overlay:
+                    overlay.set_property('valignment', 'top')
+                    overlay.set_property('halignment', 'left')
+                    overlay.set_property('font-desc', 'DejaVu Sans Mono, 10')
             self._refresh_hud()
             print("State: FEED (resumed)")
         else:
@@ -765,11 +779,17 @@ class LapcamApp:
         self._hud_splash_line = ''
         self._hud_countdown_line = ''
 
-        # Black out the video feed
         if self.pipeline:
+            # Black out the video feed
             blackout = self.pipeline.get_by_name('blackout')
             if blackout:
                 blackout.set_property('brightness', -1.0)
+            # Switch HUD to centered, larger font for pause screen
+            overlay = self.pipeline.get_by_name('hud_overlay')
+            if overlay:
+                overlay.set_property('valignment', 'center')
+                overlay.set_property('halignment', 'center')
+                overlay.set_property('font-desc', 'DejaVu Sans Mono, 16')
 
         # Start pause countdown on HUD
         self._pause_start_time = time.time()
@@ -791,19 +811,17 @@ class LapcamApp:
             GLib.idle_add(self._do_shutdown)
             return
 
-        # Build pause HUD text
+        # Build pause HUD text (centered by textoverlay)
         lines = []
-        lines.append('')
-        lines.append('                    Paused')
+        lines.append('P A U S E D')
         lines.append('')
         if self._pause_timeout_secs > 0:
             mins = int(remaining) // 60
             secs = int(remaining) % 60
-            lines.append(f'          Shutting down in {mins:02d}:{secs:02d}')
-        else:
-            lines.append('          Shutdown timer: Off')
+            lines.append(f'{mins:02d}:{secs:02d}')
         lines.append('')
-        lines.append('       Press camera button to resume')
+        lines.append('camera button to resume')
+        lines.append('power button to turn off')
 
         self._hud_stats_line = ''
         self._hud_countdown_line = '\n'.join(lines)
