@@ -1,0 +1,7 @@
+{
+    "resolution": "1080p",
+    "timeout_minutes": 5,
+    "image_flip": "none",
+    "brightness": "auto",
+    "camera_device": "/dev/video0"
+}
