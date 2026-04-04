@@ -61,86 +61,48 @@ DEFAULTS = {
     'video_sink': 'kms',
 }
 
-LIVE_ADJUSTMENTS = [
+OSD_TABS = [
     {
-        'key': 'adj_exposure',
-        'label': 'Exposure',
-        'values': ['Auto', '10%', '25%', '50%', '75%', '100%'],
+        'name': 'Image',
+        'items': [
+            {'key': 'adj_exposure', 'label': 'Exposure', 'values': ['Auto', '10%', '25%', '50%', '75%', '100%']},
+            {'key': 'adj_brightness', 'label': 'Brightness', 'values': ['-64', '-32', '0', '13', '32', '64']},
+            {'key': 'adj_contrast', 'label': 'Contrast', 'values': ['0', '5', '25', '50', '75', '95']},
+            {'key': 'adj_gain', 'label': 'Gain', 'values': ['1', '2', '4', '8']},
+            {'key': 'adj_saturation', 'label': 'Saturation', 'values': ['0', '30', '60', '80', '100']},
+            {'key': 'adj_sharpness', 'label': 'Sharpness', 'values': ['1', '3', '5', '7']},
+            {'key': 'adj_powerline', 'label': 'Anti-Flicker', 'values': ['off', '50Hz', '60Hz']},
+        ],
     },
     {
-        'key': 'adj_brightness',
-        'label': 'Brightness',
-        'values': ['-64', '-32', '0', '13', '32', '64'],
+        'name': 'Motion',
+        'items': [
+            {'key': 'motion_threshold', 'label': 'Threshold', 'values': ['5', '7', '9', '11', '13', '15']},
+            {'key': 'motion_poll', 'label': 'Poll Rate', 'values': ['100ms', '200ms', '350ms', '500ms', '1000ms']},
+            {'key': 'timeout_seconds', 'label': 'Idle Time', 'values': ['15', '120', '300', '600', '0'],
+             'display_map': {'15': '15s', '120': '2min', '300': '5min', '600': '10min', '0': 'Off'}},
+        ],
     },
     {
-        'key': 'adj_contrast',
-        'label': 'Contrast',
-        'values': ['0', '5', '25', '50', '75', '95'],
-    },
-    {
-        'key': 'adj_gain',
-        'label': 'Gain',
-        'values': ['1', '2', '4', '8'],
-    },
-    {
-        'key': 'adj_saturation',
-        'label': 'Saturation',
-        'values': ['0', '30', '60', '80', '100'],
-    },
-    {
-        'key': 'adj_sharpness',
-        'label': 'Sharpness',
-        'values': ['1', '3', '5', '7'],
-    },
-    {
-        'key': 'adj_powerline',
-        'label': 'Anti-Flicker',
-        'values': ['off', '50Hz', '60Hz'],
-    },
-    {
-        'key': 'motion_threshold',
-        'label': 'Motion Thr.',
-        'values': ['5', '7', '9', '11', '13', '15'],
-    },
-    {
-        'key': 'motion_poll',
-        'label': 'Motion Poll',
-        'values': ['100ms', '200ms', '350ms', '500ms', '1000ms'],
-    },
-    {
-        'key': 'resolution',
-        'label': 'Resolution',
-        'values': ['1080p', '720p'],
-    },
-    {
-        'key': 'timeout_seconds',
-        'label': 'Timeout',
-        'values': ['15', '120', '300', '600', '0'],
-        'display_map': {'15': '15s', '120': '2min', '300': '5min', '600': '10min', '0': 'Off'},
-    },
-    {
-        'key': 'pause_timeout_minutes',
-        'label': 'Pause Off',
-        'values': ['5', '10', '30', '0'],
-        'display_map': {'5': '5min', '10': '10min', '30': '30min', '0': 'Off'},
-    },
-    {
-        'key': 'stats',
-        'label': 'Stats',
-        'values': ['off', 'on'],
-    },
-    {
-        'key': 'video_sink',
-        'label': 'Renderer',
-        'values': ['fbdev', 'kms'],
-        'display_map': {'fbdev': '20fps+tear', 'kms': '14fps smooth'},
-    },
-    {
-        'key': 'image_flip',
-        'label': 'Image Flip',
-        'values': ['none', 'horizontal', 'vertical', 'both'],
+        'name': 'System',
+        'items': [
+            {'key': 'resolution', 'label': 'Resolution', 'values': ['1080p', '720p']},
+            {'key': 'pause_timeout_minutes', 'label': 'Pause Off', 'values': ['5', '10', '30', '0'],
+             'display_map': {'5': '5min', '10': '10min', '30': '30min', '0': 'Off'}},
+            {'key': 'stats', 'label': 'Stats', 'values': ['off', 'on']},
+            {'key': 'video_sink', 'label': 'Renderer', 'values': ['fbdev', 'kms'],
+             'display_map': {'fbdev': '20fps+tear', 'kms': '14fps smooth'}},
+            {'key': 'image_flip', 'label': 'Image Flip', 'values': ['none', 'horizontal', 'vertical', 'both']},
+            {'key': 'cli_mode', 'label': 'CLI Mode', 'values': ['--', 'activate'],
+             'display_map': {'--': '--', 'activate': 'ACTIVATE'}},
+        ],
     },
 ]
+
+# Flat list for V4L2 apply and config saving
+LIVE_ADJUSTMENTS = []
+for tab in OSD_TABS:
+    LIVE_ADJUSTMENTS.extend(tab['items'])
 
 EXPOSURE_MIN = 10
 EXPOSURE_MAX = 626
@@ -340,13 +302,32 @@ def apply_all_adjustments(device, config):
 # OSD text builder
 # ---------------------------------------------------------------------------
 
-def build_osd_text(adj_category_idx, config):
-    max_values = max(len(adj['values']) for adj in LIVE_ADJUSTMENTS)
-    col_width = 9
+def build_osd_text(tab_idx, item_idx, tab_level, config):
+    """Build tabbed OSD text.
+    tab_level=True: arrow on tab row, double click cycles tabs
+    tab_level=False: arrow on items, double click changes value
+    """
+    # Tab header with arrow if at tab level
+    tab_parts = []
+    for t, tab in enumerate(OSD_TABS):
+        if t == tab_idx:
+            tab_parts.append(f'[{tab["name"]}]')
+        else:
+            tab_parts.append(f' {tab["name"]} ')
+    tab_row = '  '.join(tab_parts)
+    if tab_level:
+        header = f' > {tab_row}'
+    else:
+        header = f'   {tab_row}'
 
-    lines = []
-    for i, adj in enumerate(LIVE_ADJUSTMENTS):
-        is_selected = (i == adj_category_idx)
+    # Items for active tab
+    items = OSD_TABS[tab_idx]['items']
+    col_width = 9
+    max_values = max(len(item['values']) for item in items)
+
+    lines = [header, '']
+    for i, adj in enumerate(items):
+        is_selected = (not tab_level and i == item_idx)
         current_val = str(config.get(adj['key'], adj['values'][0]))
         marker = '>' if is_selected else ' '
         label = adj['label'].ljust(12)
@@ -562,6 +543,9 @@ class LapcamApp:
         # OSD state
         self._adj_category_idx = 0
         self._osd_visible = False
+        self._osd_tab_level = True  # True = navigating tabs, False = navigating items
+        self._osd_tab_idx = 0
+        self._osd_item_idx = 0
 
         # Motion detection
         self._motion_sample = None
@@ -844,14 +828,14 @@ class LapcamApp:
         if self.state == self.STATE_PAUSE:
             GLib.idle_add(self._start_feed)
         elif self.state == self.STATE_FEED:
-            GLib.idle_add(self._adj_next_category)
+            GLib.idle_add(self._adj_navigate)
 
     def _on_button_double(self):
         """Camera button double click."""
         if self.state == self.STATE_PAUSE:
             GLib.idle_add(self._start_feed)
         elif self.state == self.STATE_FEED:
-            GLib.idle_add(self._adj_change_value)
+            GLib.idle_add(self._adj_select)
 
     # -- Stats overlay --
 
@@ -938,13 +922,13 @@ class LapcamApp:
 
     def _show_osd(self):
         self._osd_visible = True
-        # Reset inactivity timer — user is interacting
         self.last_motion_time = time.time()
-        # Clear countdown if showing
         if self._countdown_active:
             self._hud_countdown_line = ''
             self._countdown_active = False
-        self._hud_osd_text = build_osd_text(self._adj_category_idx, self.config)
+        self._hud_osd_text = build_osd_text(
+            self._osd_tab_idx, self._osd_item_idx,
+            self._osd_tab_level, self.config)
         self._refresh_hud()
         self._reset_osd_timer()
 
@@ -962,18 +946,53 @@ class LapcamApp:
         self.osd_timer.daemon = True
         self.osd_timer.start()
 
-    def _adj_next_category(self):
-        self._adj_category_idx = (self._adj_category_idx + 1) % len(LIVE_ADJUSTMENTS)
-        self._show_osd()
-        adj = LIVE_ADJUSTMENTS[self._adj_category_idx]
-        print(f"OSD category: {adj['label']}")
-
-    def _adj_change_value(self):
+    def _adj_navigate(self):
+        """Single click — move arrow down. Tab row → first item. Item → next item. Last item → tab row."""
         if not self._osd_visible:
+            self._osd_tab_level = True
             self._show_osd()
             return
 
-        adj = LIVE_ADJUSTMENTS[self._adj_category_idx]
+        if self._osd_tab_level:
+            # Move down from tab row to first item
+            self._osd_tab_level = False
+            self._osd_item_idx = 0
+            self._show_osd()
+            items = OSD_TABS[self._osd_tab_idx]['items']
+            print(f"OSD item: {items[0]['label']}")
+        else:
+            # Next item
+            items = OSD_TABS[self._osd_tab_idx]['items']
+            self._osd_item_idx += 1
+            if self._osd_item_idx >= len(items):
+                # Past last item — back to tab row
+                self._osd_tab_level = True
+                self._osd_item_idx = 0
+                self._show_osd()
+                print("OSD: back to tabs")
+            else:
+                self._show_osd()
+                print(f"OSD item: {items[self._osd_item_idx]['label']}")
+
+    def _adj_select(self):
+        """Double click — cycle tabs (on tab row) or change value (on item)."""
+        if not self._osd_visible:
+            self._osd_tab_level = True
+            self._show_osd()
+            return
+
+        if self._osd_tab_level:
+            # Cycle to next tab
+            self._osd_tab_idx = (self._osd_tab_idx + 1) % len(OSD_TABS)
+            self._osd_item_idx = 0
+            self._show_osd()
+            print(f"OSD tab: {OSD_TABS[self._osd_tab_idx]['name']}")
+        else:
+            # Change value of selected item
+            adj = OSD_TABS[self._osd_tab_idx]['items'][self._osd_item_idx]
+            self._adj_change_value_impl(adj)
+
+    def _adj_change_value_impl(self, adj):
         current = str(self.config.get(adj['key'], adj['values'][0]))
         try:
             idx = adj['values'].index(current)
@@ -986,7 +1005,24 @@ class LapcamApp:
         save_config(self.config)
 
         key = adj['key']
-        if key in ('resolution', 'video_sink'):
+        if key == 'cli_mode':
+            if new_val == 'activate':
+                # Reset to default so next boot doesn't activate CLI
+                self.config['cli_mode'] = '--'
+                save_config(self.config)
+                print("Dropping to CLI mode...")
+                self._stop_feed_pipeline()
+                try:
+                    with open('/sys/class/graphics/fb0/blank', 'w') as f:
+                        f.write('0')
+                except (PermissionError, OSError):
+                    pass
+                show_message("CLI Mode - reboot to return")
+                time.sleep(1)
+                self.stop()
+                sys.exit(EXIT_CODE_CLI)
+            return
+        elif key in ('resolution', 'video_sink'):
             self._stop_feed_pipeline()
             pipeline_str = build_feed_pipeline(self.config)
             self._start_feed_pipeline(pipeline_str)
