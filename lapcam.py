@@ -378,9 +378,9 @@ def build_feed_pipeline(config):
 
     overlay = (
         '! videobalance name=blackout '
-        '! textoverlay name=hud_overlay text="" '
-        'valignment=top halignment=left '
-        'font-desc="DejaVu Sans Mono, 10" '
+        '! textoverlay name=hud_overlay text="Starting..." '
+        'valignment=center halignment=center '
+        'font-desc="DejaVu Sans Mono, 16" '
         'draw-shadow=true shaded-background=true '
     )
 
@@ -732,12 +732,7 @@ class LapcamApp:
                 blackout = self.pipeline.get_by_name('blackout')
                 if blackout:
                     blackout.set_property('brightness', 0.0)
-                # Restore HUD to normal position and size
-                overlay = self.pipeline.get_by_name('hud_overlay')
-                if overlay:
-                    overlay.set_property('valignment', 'top')
-                    overlay.set_property('halignment', 'left')
-                    overlay.set_property('font-desc', 'DejaVu Sans Mono, 10')
+                self._set_hud_normal()
             self._refresh_hud()
             print("State: FEED (resumed)")
         else:
@@ -747,7 +742,6 @@ class LapcamApp:
             self._prev_motion_sample = None
 
             show_message("Starting...")
-            self._feed_start_time = time.time()
 
             pipeline_str = build_feed_pipeline(self.config)
             self._start_feed_pipeline(pipeline_str)
@@ -756,6 +750,7 @@ class LapcamApp:
             apply_all_adjustments(device, self.config)
 
             self._show_splash()
+            print("State: FEED (cold start)")
             print("State: FEED (cold start)")
 
         # Start stats if enabled
@@ -780,16 +775,10 @@ class LapcamApp:
         self._hud_countdown_line = ''
 
         if self.pipeline:
-            # Black out the video feed
             blackout = self.pipeline.get_by_name('blackout')
             if blackout:
                 blackout.set_property('brightness', -1.0)
-            # Switch HUD to centered, larger font for pause screen
-            overlay = self.pipeline.get_by_name('hud_overlay')
-            if overlay:
-                overlay.set_property('valignment', 'center')
-                overlay.set_property('halignment', 'center')
-                overlay.set_property('font-desc', 'DejaVu Sans Mono, 16')
+            self._set_hud_centered()
 
         # Start pause countdown on HUD
         self._pause_start_time = time.time()
@@ -922,18 +911,38 @@ class LapcamApp:
 
     # -- Splash overlay --
 
+    def _set_hud_centered(self, large=True):
+        """Switch HUD overlay to centered large font."""
+        if self.pipeline:
+            overlay = self.pipeline.get_by_name('hud_overlay')
+            if overlay:
+                overlay.set_property('valignment', 'center')
+                overlay.set_property('halignment', 'center')
+                overlay.set_property('font-desc',
+                    'DejaVu Sans Mono, 16' if large else 'DejaVu Sans Mono, 10')
+
+    def _set_hud_normal(self):
+        """Switch HUD overlay back to top-left small font."""
+        if self.pipeline:
+            overlay = self.pipeline.get_by_name('hud_overlay')
+            if overlay:
+                overlay.set_property('valignment', 'top')
+                overlay.set_property('halignment', 'left')
+                overlay.set_property('font-desc', 'DejaVu Sans Mono, 10')
+
     def _show_splash(self):
-        startup_time = time.time() - self._feed_start_time
-        self._hud_splash_line = f'[Cam btn] Adjust image    (started in {startup_time:.1f}s)'
+        self._set_hud_centered()
+        self._hud_splash_line = 'Camera button to adjust image'
         self._refresh_hud()
         if self.splash_timer:
             self.splash_timer.cancel()
-        self.splash_timer = threading.Timer(3.0, self._hide_splash)
+        self.splash_timer = threading.Timer(4.0, self._hide_splash)
         self.splash_timer.daemon = True
         self.splash_timer.start()
 
     def _hide_splash(self):
         self._hud_splash_line = ''
+        self._set_hud_normal()
         self._refresh_hud()
 
     # -- Live adjustment OSD --
